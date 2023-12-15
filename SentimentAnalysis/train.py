@@ -14,9 +14,7 @@ from torch.optim import AdamW
 
 from dataset import ShoppingReviewDataset
 
-model_path = "/root/autodl-tmp/chinese_wwm_pytorch"
-model_save_dir = "/root/autodl-tmp/myChinese_wwm_ckps"
-dataset_path = "/root/autodl-tmp/online_shopping_10_cats.csv"
+from config import *
 
 device = torch.device("cuda:0")
 
@@ -24,7 +22,7 @@ df = pd.read_csv(dataset_path)
 df = df[df['cat'] == '手机']
 
 # 查看数据集结构
-print(df.head())
+# print(df.head())
 
 def merge_dictionaries(dic):
     merged_dict = {}
@@ -41,13 +39,13 @@ tokenizer = BertTokenizer.from_pretrained(model_path)# 'bert-base-chinese')
 
 def preprocess(text):
     text = str(text)
-    return tokenizer(text, padding='max_length', truncation=True, max_length=512)
+    return tokenizer(text, padding='max_length', truncation=True, max_length=MAX_LENGTH)
 
 # 应用预处理到每个评论
 df['encoded'] = df['review'].apply(preprocess)
 
 
-train_df, test_df = train_test_split(df, test_size=0.2)
+train_df, test_df = train_test_split(df, test_size=TEST_SIZE)
 
 train_input = merge_dictionaries(train_df['encoded'].to_dict())
 train_labels = train_df['label'].tolist()
@@ -65,8 +63,8 @@ test_dataset = ShoppingReviewDataset(test_input, test_labels)
 
 
 # 创建数据加载器
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=TRAIN_BATCHSIZE, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=TEST_BATCHSIZE, shuffle=False)
 
 
 
@@ -75,32 +73,35 @@ model = BertForSequenceClassification.from_pretrained(model_path, num_labels=2)
 model = model.to(device)
 
 # 优化器
-optimizer = AdamW(model.parameters(), lr=1e-5)
+optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
 
 # 初始化用于保存loss值的列表
 epoch_loss_values = []
 
-for epoch in range(3):  # 迭代次数
+for epoch in range(MAX_EPOCHS):  # 迭代次数
     model.train()
     total_loss = 0
-    avg_loss = 1e10
     # 使用tqdm显示进度条
-    for batch in tqdm(train_loader, desc=f"Epoch {epoch + 1}， loss: {avg_loss}"):
-        optimizer.zero_grad()
-        input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        labels = batch['labels'].to(device)
-        outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
-        loss = outputs.loss
-        total_loss += loss.item()
-        loss.backward()
-        optimizer.step()
+    with tqdm(total=len(train_loader), desc=f'Epoch {epoch + 1}', unit='batch') as pbar:
+        for batch in train_loader:
+            optimizer.zero_grad()
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss
+            total_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+            pbar.set_description(f'Epoch {epoch + 1}/{MAX_EPOCHS} - Loss: {loss.item():.4f}')
+            pbar.update(1)
+
     
     # 计算平均loss
     avg_loss = total_loss / len(train_loader)
     epoch_loss_values.append(avg_loss)
     with open('log.txt', 'a') as file:
-        file.write(f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}")
+        file.write(f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}\n")
     print(f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}")
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir)
@@ -113,3 +114,24 @@ plt.title('Training Loss Over Time')
 plt.legend()
 plt.savefig('loss.png')
 
+model.eval()
+total_eval_accuracy = 0
+total_eval_loss = 0
+
+for batch in test_loader:
+    with torch.no_grad():
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        labels = batch['labels'].to(device)
+        outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+        loss = outputs.loss
+        logits = outputs.logits
+
+        # 计算准确率
+        predictions = torch.argmax(logits, dim=-1)
+        correct_predictions = torch.eq(predictions, labels).sum().item()
+        total_eval_accuracy += correct_predictions
+
+# 计算整体准确率
+accuracy = total_eval_accuracy / len(test_dataset)
+print(f"Accuracy: {accuracy}")
