@@ -16,10 +16,12 @@ from dataset import ShoppingReviewDataset
 
 from config import *
 from utils import *
+
+print("curtime:",formatted_time)
 device = torch.device("cuda:0")
 
 df = pd.read_csv(dataset_path)
-df = df[df['cat'].isin([])]
+df = df[df['cat'].isin(['手机','平板'])]
 
 work_dir = os.path.dirname(os.path.abspath(__file__))
 def merge_dictionaries(dic):
@@ -75,8 +77,9 @@ optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
 
 # 初始化用于保存loss值的列表
 epoch_loss_values = []
+step_loss_values = []
 
-for epoch in range(MAX_EPOCHS):  # 迭代次数
+for epoch in range(EPOCHS):  # 迭代次数
     model.train()
     total_loss = 0
     # 使用tqdm显示进度条
@@ -91,7 +94,8 @@ for epoch in range(MAX_EPOCHS):  # 迭代次数
             total_loss += loss.item()
             loss.backward()
             optimizer.step()
-            pbar.set_description(f'Epoch {epoch + 1}/{MAX_EPOCHS} - Loss: {loss.item():.4f}')
+            step_loss_values.append(loss.item())
+            pbar.set_description(f'Epoch {epoch + 1}/{EPOCHS} - Loss: {loss.item():.4f}')
             pbar.update(1)
 
     
@@ -99,16 +103,30 @@ for epoch in range(MAX_EPOCHS):  # 迭代次数
     avg_loss = total_loss / len(train_loader)
     epoch_loss_values.append(avg_loss)
     myLog(work_dir, f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}")
-    if not os.path.exists(model_save_dir):
-        os.makedirs(model_save_dir)
-    torch.save(model.state_dict(), os.path.join(model_save_dir, f"epoch_{epoch+1}.pth"))
+    model_save_path = os.path.join(model_save_dir, str(epoch))
+    if not os.path.exists(model_save_path):
+        os.makedirs(model_save_path)
+    # torch.save(model.state_dict(), os.path.join(model_save_path, f"epoch_{epoch+1}.pth"))
+    # 保存微调后的模型到本地
+    model.save_pretrained(model_save_path)
 
+    # 保存tokenizer到本地
+    tokenizer.save_pretrained(model_save_path)
+
+plt.figure(1)
 plt.plot(epoch_loss_values, label='Training Loss')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
-plt.title('Training Loss Over Time')
+plt.title('Training Loss per epoch Over Time')
 plt.legend()
-plt.savefig('train_log/log_loss.png')
+plt.savefig('train_log/log_loss_epochs.png')
+
+plt.plot(step_loss_values, label='Training Loss')
+plt.xlabel('Steps')
+plt.ylabel('Loss')
+plt.title('Training Loss per step Over Time')
+plt.legend()
+plt.savefig('train_log/log_loss_steps.png')
 
 model.eval()
 total_eval_accuracy = 0
