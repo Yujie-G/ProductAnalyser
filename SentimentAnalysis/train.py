@@ -15,15 +15,13 @@ from torch.optim import AdamW
 from dataset import ShoppingReviewDataset
 
 from config import *
-
+from utils import *
 device = torch.device("cuda:0")
 
 df = pd.read_csv(dataset_path)
-df = df[df['cat'] == '手机']
+df = df[df['cat'].isin([])]
 
-# 查看数据集结构
-# print(df.head())
-
+work_dir = os.path.dirname(os.path.abspath(__file__))
 def merge_dictionaries(dic):
     merged_dict = {}
     for sub_dict in dic.values():
@@ -100,9 +98,7 @@ for epoch in range(MAX_EPOCHS):  # 迭代次数
     # 计算平均loss
     avg_loss = total_loss / len(train_loader)
     epoch_loss_values.append(avg_loss)
-    with open('log.txt', 'a') as file:
-        file.write(f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}\n")
-    print(f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}")
+    myLog(work_dir, f"Epoch {epoch + 1} finished, Avg Loss: {avg_loss:.4f}")
     if not os.path.exists(model_save_dir):
         os.makedirs(model_save_dir)
     torch.save(model.state_dict(), os.path.join(model_save_dir, f"epoch_{epoch+1}.pth"))
@@ -112,7 +108,7 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.title('Training Loss Over Time')
 plt.legend()
-plt.savefig('loss.png')
+plt.savefig('train_log/log_loss.png')
 
 model.eval()
 total_eval_accuracy = 0
