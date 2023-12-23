@@ -17,11 +17,16 @@ from dataset import ShoppingReviewDataset
 from config import *
 from utils import *
 
+EPOCHS = int(sys.argv[1]) if len(sys.argv) > 1 else EPOCHS
+LEARNING_RATE = float(sys.argv[2]) if len(sys.argv) > 2 else LEARNING_RATE
+TRAIN_BATCHSIZE = int(sys.argv[3]) if len(sys.argv) > 3 else TRAIN_BATCHSIZE
+save_model = 1 if (len(sys.argv) > 4 and sys.argv[4] == "--save_model") else None
+
 myLog(save_dir, "curtime:"+formatted_time)
 device = torch.device("cuda:0")
 
 df = pd.read_csv(dataset_path)
-df = df[df['cat'].isin(['手机','平板'])] # ,'平板','计算机'
+df = df[df['cat'].isin(['手机','平板','计算机'])]
 
 work_dir = os.path.dirname(os.path.abspath(__file__))
 def merge_dictionaries(dic):
@@ -106,15 +111,16 @@ for epoch in range(EPOCHS):  # 迭代次数
     avg_loss = total_loss / len(train_loader)
     epoch_loss_values.append(avg_loss)
     myLog(save_dir, f"[Epoch {epoch + 1}] Avg Loss: {avg_loss:.4f}")
-    model_save_path = os.path.join(save_dir, str(epoch))
-    if not os.path.exists(model_save_path):
-        os.makedirs(model_save_path)
-    # torch.save(model.state_dict(), os.path.join(model_save_path, f"epoch_{epoch+1}.pth"))
-    # 保存微调后的模型到本地
-    model.save_pretrained(model_save_path)
+    if save_model:
+        model_save_path = os.path.join(save_dir, str(epoch))
+        if not os.path.exists(model_save_path):
+            os.makedirs(model_save_path)
 
-    # 保存tokenizer到本地
-    tokenizer.save_pretrained(model_save_path)
+        # 保存微调后的模型到本地
+        model.save_pretrained(model_save_path)
+
+        # 保存tokenizer到本地
+        tokenizer.save_pretrained(model_save_path)
 
 plt.figure(1)
 plt.plot(epoch_loss_values, label='Training Loss')

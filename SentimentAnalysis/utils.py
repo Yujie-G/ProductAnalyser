@@ -24,5 +24,5 @@ def myLog(dir, string):
     print(string)
     Time = get_timeString()
     with open(log_file_name, 'a') as file:
-        file.write('['+Time+'] '+string)
+        file.write('['+Time+'] '+string+ '\n')
     
