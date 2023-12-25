@@ -14,19 +14,20 @@ from torch.optim import AdamW
 
 from dataset import ShoppingReviewDataset
 
-from config import *
+from config import config
 from utils import *
 
-EPOCHS = int(sys.argv[1]) if len(sys.argv) > 1 else EPOCHS
-LEARNING_RATE = float(sys.argv[2]) if len(sys.argv) > 2 else LEARNING_RATE
-TRAIN_BATCHSIZE = int(sys.argv[3]) if len(sys.argv) > 3 else TRAIN_BATCHSIZE
-save_model = 1 if (len(sys.argv) > 4 and sys.argv[4] == "--save_model") else None
+cfg = config()
+cfg.epochs = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+cfg.learning_rate = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-5
+cfg.train_batchsize = int(sys.argv[3]) if len(sys.argv) > 3 else 16
+cfg.save_model = 1 if (len(sys.argv) > 4 and sys.argv[4] == "--save_model") else None
 
-myLog(save_dir, "curtime:"+formatted_time)
+myLog(cfg, "------start train------")
 device = torch.device("cuda:0")
 
-df = pd.read_csv(dataset_path)
-df = df[df['cat'].isin(['手机','平板','计算机'])]
+df = pd.read_csv(cfg.dataset_path)
+df = df[df['cat'].isin(['手机'])] # ,'平板','计算机'
 
 work_dir = os.path.dirname(os.path.abspath(__file__))
 def merge_dictionaries(dic):
@@ -40,17 +41,17 @@ def merge_dictionaries(dic):
     return merged_dict
 
 # 初始化BERT分词器
-tokenizer = BertTokenizer.from_pretrained(model_path)# 'bert-base-chinese')
+tokenizer = BertTokenizer.from_pretrained(cfg.model_path)# 'bert-base-chinese')
 
 def preprocess(text):
     text = str(text)
-    return tokenizer(text, padding='max_length', truncation=True, max_length=MAX_LENGTH)
+    return tokenizer(text, padding='max_length', truncation=True, max_length=cfg.max_length)
 
 # 应用预处理到每个评论
 df['encoded'] = df['review'].apply(preprocess)
 
 
-train_df, test_df = train_test_split(df, test_size=TEST_SIZE)
+train_df, test_df = train_test_split(df, test_size=cfg.test_size)
 
 train_input = merge_dictionaries(train_df['encoded'].to_dict())
 train_labels = train_df['label'].tolist()
@@ -68,23 +69,23 @@ test_dataset = ShoppingReviewDataset(test_input, test_labels)
 
 
 # 创建数据加载器
-train_loader = DataLoader(train_dataset, batch_size=TRAIN_BATCHSIZE, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=TEST_BATCHSIZE, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=cfg.train_batchsize, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=cfg.test_batchsize, shuffle=False)
 
 
 
 # 加载预训练的BERT模型
-model = BertForSequenceClassification.from_pretrained(model_path, num_labels=2)
+model = BertForSequenceClassification.from_pretrained(cfg.model_path, num_labels=2)
 model = model.to(device)
 
 # 优化器
-optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
+optimizer = AdamW(model.parameters(), lr=cfg.learning_rate)
 
 # 初始化用于保存loss值的列表
 epoch_loss_values = []
 step_loss_values = []
 
-for epoch in range(EPOCHS):  # 迭代次数
+for epoch in range(cfg.epochs):  # 迭代次数
     model.train()
     total_loss = 0
     # 使用tqdm显示进度条
@@ -102,7 +103,7 @@ for epoch in range(EPOCHS):  # 迭代次数
             optimizer.step()
             if step % 100 == 0:
                 step_loss_values.append(loss.item())
-            pbar.set_description(f'Epoch {epoch + 1}/{EPOCHS} - Loss: {loss.item():.4f}')
+            pbar.set_description(f'Epoch {epoch + 1}/{cfg.epochs} - Loss: {loss.item():.4f}')
             pbar.update(1)
             step += 1
 
@@ -110,9 +111,9 @@ for epoch in range(EPOCHS):  # 迭代次数
     # 计算平均loss
     avg_loss = total_loss / len(train_loader)
     epoch_loss_values.append(avg_loss)
-    myLog(save_dir, f"[Epoch {epoch + 1}] Avg Loss: {avg_loss:.4f}")
-    if save_model:
-        model_save_path = os.path.join(save_dir, str(epoch))
+    myLog(cfg, f"[Epoch {epoch + 1}] Avg Loss: {avg_loss:.4f}")
+    if cfg.save_model is not None:
+        model_save_path = os.path.join(cfg.save_dir, str(epoch))
         if not os.path.exists(model_save_path):
             os.makedirs(model_save_path)
 
@@ -128,14 +129,14 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.title('Training Loss per epoch Over Time')
 plt.legend()
-plt.savefig(os.path.join(save_dir, 'train_log','log_loss_epochs.png'))
+plt.savefig(os.path.join(cfg.save_dir, 'train_log','log_loss_epochs.png'))
 plt.clf()
 plt.plot(step_loss_values, label='Training Loss')
 plt.xlabel('Steps')
 plt.ylabel('Loss')
 plt.title('Training Loss per step Over Time')
 plt.legend()
-plt.savefig(os.path.join(save_dir, 'train_log','log_loss_steps.png'))
+plt.savefig(os.path.join(cfg.save_dir, 'train_log','log_loss_steps.png'))
 
 model.eval()
 total_eval_accuracy = 0
@@ -157,4 +158,4 @@ for batch in test_loader:
 
 # 计算整体准确率
 accuracy = total_eval_accuracy / len(test_dataset)
-myLog(save_dir, f"Accuracy: {accuracy}")
+myLog(cfg, f"Accuracy: {accuracy}")
