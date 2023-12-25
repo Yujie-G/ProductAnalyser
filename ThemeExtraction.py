@@ -37,7 +37,7 @@ with open(os.path.join(dir_path, save_name), "w", encoding='utf-8') as file:
     for topic in topics:
         sent = topic[1].split(' + ')
         for a_mult_b in sent:
+            value = a_mult_b.split('*')[0]
             theme = a_mult_b.split('*')[-1].strip('"')
-            print(theme)
-            file.write(theme + '\n')
+            file.write(theme +','+ value + '\n')
             
