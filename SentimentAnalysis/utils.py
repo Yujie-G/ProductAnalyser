@@ -14,7 +14,9 @@ def myLog(config, string):
     log_file_name = os.path.join(log_file_dir, 'log.txt')
     if start:
         print('--------Logger start----------')
-        print(f'Epochs:{config.epochs}\nLr: {config.learning_rate}\nTrain batchsize: {config.train_batchsize}\nMAX_LENGTH: {config.max_length}\n')
+        print(f'Epochs:{config.epochs}\nLr: {config.learning_rate}\n\
+Train batchsize: {config.train_batchsize}\nOptimizer: {config.optimizer}\n\
+MAX_LENGTH: {config.max_length}\n Train-val-test split:{1 - config.test_size}-{config.val_size}-{config.test_size - config.val_size}\n')
         print('------------------------------')
         if not os.path.exists(log_file_dir):
             os.system(f"mkdir -p {log_file_dir}")

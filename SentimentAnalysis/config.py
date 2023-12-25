@@ -1,5 +1,4 @@
 from datetime import datetime
-import sys
 
 class config:
     def __init__(self):
@@ -20,5 +19,7 @@ class config:
         self.test_batchsize = 8
 
         self.max_length = 128
+        self.optimizer = "AdamW"
 
+        self.val_size = 0.1
         self.test_size = 0.2
